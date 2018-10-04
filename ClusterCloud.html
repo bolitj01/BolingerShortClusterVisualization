@@ -3,10 +3,27 @@
         <script src = "TextSearch.js"></script>
     </head>
     <body>
-        <input id="fileSelect" type=file webkitdirectory mozdirectory msdirectory odirectory directory multiple onchange="readFiles(event)">
+        <div>
+            <h3>Select a corpus:</h3>
+            <input id="fileSelect" type=file webkitdirectory mozdirectory msdirectory odirectory directory multiple onchange="readFiles(event)" >
+        </div>
+        <br>
         
-        <svg id="ClusterCloud"></svg>
+        <div>
+            <form>
+                Enter a query:
+                <input id="query" type="text">
+                <input id="searchButton" type="button" value="Search" onclick="search()">
+            </form>
+        </div>
+        <br>
         
+        <div>
+            <svg id="ClusterCloud"></svg>
+        </div>
+        
+        <br>
+        <br>
         <div id = "preview"></div>
     </body>
 </html>
