@@ -1,0 +1,21 @@
+extends layout
+
+block content
+    div
+        h3 Select a corpus:
+        input(id="fileSelect" type="file" webkitdirectory mozdirectory msdirectory odirectory directory multiple onchange="readFiles(event)")
+    br
+
+    div
+        form
+            p entery a query
+            input(id="query" type="text")
+            input(id="searchButton" type="button" value="Search" onclick="search()")
+    br
+    
+    div
+        svg(id="ClusterCloud")
+    br
+    br
+    
+    div(id="preview")
