@@ -3,8 +3,10 @@
 var query;
 var keywords;
 
-var documents;
+var documents = [];
 var docKeywordCounts;
+
+var corpusTotal;
 
 
 
@@ -31,9 +33,17 @@ function Document(id, title, totalWords, keywordCounts){
             //Inverse document frequency
             var idf = Math.log(documents.length / keywords[i].corpusCount);
             
-            return tf * idf;
+            this.keywordTFIDFs[i] = tf * idf;
         }
     };
+    
+    //Calculates the force for each keyword node in the force-directed graph
+    //Currently just returns the TFIDF value
+    this.calculateForces = function(){
+        for (var i = 0; i < keywordCounts.length; i++){
+            this.keywordForces[i] = this.keywordTFIDFs[i];
+        }
+    }
     
     this.toString = function(){
         return this.id + " " + this.title + " " + this.totalWords + " " + this.keywordCounts + " " + this.keywordTFIDFs;
@@ -62,7 +72,7 @@ function readFiles(evt){
     corpusTotal = files.length;
 }
 
-function search(){
+function processCorpus(){
 
     //Initialize documents
     documents = [];
@@ -91,7 +101,7 @@ function search(){
             
         })(f);
         
-        reader.readAsText(f)
+        reader.readAsText(f);
     }
     
 }
@@ -115,7 +125,7 @@ function read(event, file){
     }
 
     //Reset document counts
-    docKeywordCounts.fill(0)
+    docKeywordCounts.fill(0);
     var totalWords = 0;
     var found = false;
 
@@ -135,12 +145,61 @@ function read(event, file){
 
     var doc = new Document(filename, title, totalWords, docKeywordCounts);
     documents.push(doc);
-    var div = document.createElement("div");
-    //Process and print documents
-    document.getElementById("preview").appendChild(div);
-    div.appendChild(document.createTextNode(doc.toString()));
-    document.getElementById("preview").appendChild(document.createElement("br"));
-    
 }
 
+function finalizeDocuments(){
+    
+    
+    if (documents.length == corpusTotal){
+        
+        for (var x = 0; x < documents.length; x++){
+            documents[x].calculateTFIDF();
+            documents[x].calculateForces();
+        }
+         
+        sortDocuments();
+        
+        for (var x = 0; x < documents.length; x++){
+            //Print test data
+            var div = document.createElement("div");
+            document.getElementById("preview").appendChild(div);
+            for (var y = 0; y < keywords.length; y++){
+                div.appendChild(document.createTextNode(documents[x].keywordForces[y] + ", "));
+            }
+            document.getElementById("preview").appendChild(document.createElement("br"));
+        }
+    }    
+    else{
+        var div = document.createElement("div");
+        document.getElementById("preview").appendChild(div);
+        div.appendChild(document.createTextNode(documents.length));
+        document.getElementById("preview").appendChild(document.createElement("br"));
+    }
+}
 
+//Sort documents by keyword forces using optimized bubble sort
+function sortDocuments(){
+    var swapped;
+    do {
+        swapped = false;
+        for(var i = 0; i < documents.length - 1; i++) {
+            var avg1 = averageForce(documents[i]);
+            var avg2 = averageForce(documents[i + 1])
+            if(avg1 && avg2 && avg1 < avg2) {
+                var temp = documents[i];
+                documents[i] = documents[i + 1];
+                documents[i + 1] = temp;
+                swapped = true;
+            }
+        }
+    } while(swapped);
+}
+
+function averageForce(doc){
+    var avg = 0;
+    for (x = 0; x < doc.keywordForces.length; x++){
+        avg += doc.keywordForces[x];
+    }
+    avg = avg / doc.keywordForces.length;
+    return avg;
+}
