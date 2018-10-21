@@ -7,13 +7,17 @@ var documents = [];
 var docKeywordCounts;
 
 var corpusTotal;
+var progressUpdateBound;
 
+//The maximum force of any Keyword in the corpus for the search
+var forceRange;
 
 
 //Prototype for a single document
 function Document(id, title, totalWords, keywordCounts){
     this.id = id;
     this.title = title;
+    //this.date = date; would be nice to use eventually for transparency
     
     this.totalWords = totalWords;
     
@@ -70,6 +74,7 @@ function readFiles(evt){
     //FileList of files
     files = evt.target.files;
     corpusTotal = files.length;
+    progressUpdateBound = corpusTotal / 100;
 }
 
 function processCorpus(){
@@ -145,12 +150,25 @@ function read(event, file){
 
     var doc = new Document(filename, title, totalWords, docKeywordCounts);
     documents.push(doc);
+    
+    //Update each 1% of the progress bar
+    if (documents.length % progressUpdateBound < 1){
+        updateProgressBar();
+    }
+    
+    //Finalize documents after last one is read
+    if (documents.length == corpusTotal){
+        finalizeDocuments();
+    }
 }
 
 function finalizeDocuments(){
     
     
-    if (documents.length == corpusTotal){
+//    if (documents.length == corpusTotal){
+        
+        //Reset force range
+        forceRange = 0;
         
         for (var x = 0; x < documents.length; x++){
             documents[x].calculateTFIDF();
@@ -168,13 +186,13 @@ function finalizeDocuments(){
             }
             document.getElementById("preview").appendChild(document.createElement("br"));
         }
-    }    
-    else{
-        var div = document.createElement("div");
-        document.getElementById("preview").appendChild(div);
-        div.appendChild(document.createTextNode(documents.length));
-        document.getElementById("preview").appendChild(document.createElement("br"));
-    }
+//    }    
+//    else{
+//        var div = document.createElement("div");
+//        document.getElementById("preview").appendChild(div);
+//        div.appendChild(document.createTextNode(documents.length));
+//        document.getElementById("preview").appendChild(document.createElement("br"));
+//    }
 }
 
 //Sort documents by keyword forces using optimized bubble sort
@@ -195,6 +213,7 @@ function sortDocuments(){
     } while(swapped);
 }
 
+//Calculate the average of all Keyword forces for a document
 function averageForce(doc){
     var avg = 0;
     for (x = 0; x < doc.keywordForces.length; x++){
@@ -203,3 +222,15 @@ function averageForce(doc){
     avg = avg / doc.keywordForces.length;
     return avg;
 }
+
+//Display and update the progress bar
+var updateProgressBar = function(){
+    document.getElementById("progress").style.display = "block";
+    
+    var progressBar = document.getElementById("progressBar");
+    var width = Math.ceil(documents.length / progressUpdateBound);
+    
+    progressBar.style.width = width + "%";
+    progressBar.innerHTML = width + "%";
+}
+

@@ -11,7 +11,12 @@ block content
             p entery a query
             input(id="query" type="text")
             input(id="searchButton" type="button" value="Search" onclick="processCorpus()")
-            input(id="test" type="button" value="Graph" onclick="finalizeDocuments()")
+            
+            div(id="progress")
+                p Search Progress
+                div(id="progressDisplay")
+                    div(id="progressBar")
+                        p 0%
     br
     
     div
