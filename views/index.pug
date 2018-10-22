@@ -19,7 +19,11 @@ block content
                         p 0%
     br
     
-    div
+    h2(style="text-align:center;") Cluster Cloud
+    div(id="graphDisplay")
+        div(id="sliderDisplay")
+            h3(id="sliderLabel") Detail Level
+            input(id="slider" type="range" min="1" value="2" max="5")
         svg(id="ClusterCloud")
     br
     br

@@ -24,3 +24,33 @@ a {
     line-height: 30px;
     color: white;
 }
+
+#graphDisplay{
+    display: flex;
+    flex-direction: row;
+    width:600px;
+    height: 400px;
+}
+
+#sliderDisplay{
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    text-align: center;
+    width: 15%;
+}
+
+#sliderLabel{
+    margin: 0 0 0 0;
+    height: 10%;
+}
+
+#slider{
+    -webkit-appearance: slider-vertical;
+    height: 90%;
+}
+
+#ClusterCloud{
+    outline-style: solid;
+    width: 85%;
+}
