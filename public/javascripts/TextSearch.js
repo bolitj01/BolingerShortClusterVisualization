@@ -46,6 +46,9 @@ function Document(id, title, totalWords, keywordCounts){
     this.calculateForces = function(){
         for (var i = 0; i < keywordCounts.length; i++){
             this.keywordForces[i] = this.keywordTFIDFs[i];
+            if (this.keywordForces[i] > forceRange){
+                forceRange = this.keywordForces[i];
+            }
         }
     }
     
