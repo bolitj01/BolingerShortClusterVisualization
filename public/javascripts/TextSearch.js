@@ -1,6 +1,6 @@
 //Global data
 //Search terms
-var query;
+var query = []; //Search terms
 var keywords;
 
 var documents = [];
@@ -10,7 +10,7 @@ var corpusTotal;
 var progressUpdateBound;
 
 //The maximum force of any Keyword in the corpus for the search
-var forceRange;
+var forceRange;//TF-IDF scores
 
 
 //Prototype for a single document
