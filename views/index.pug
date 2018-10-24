@@ -8,18 +8,18 @@ block content
 
     div
         form
-            p entery a query
+            h3 Entery a query:
             input(id="query" type="text")
             input(id="searchButton" type="button" value="Search" onclick="processCorpus()")
             
-            div(id="progress")
+            div(id="progressDisplay")
                 p Search Progress
-                div(id="progressDisplay")
+                div(id="progressBackground")
                     div(id="progressBar")
                         p 0%
     br
     
-    h2(style="text-align:center;") Cluster Cloud
+    h1(style="text-align:center;") Cluster Cloud
     div(id="graphDisplay")
         div(id="sliderDisplay")
             h3(id="sliderLabel") Detail Level

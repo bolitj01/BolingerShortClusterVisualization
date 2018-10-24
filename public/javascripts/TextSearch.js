@@ -184,6 +184,7 @@ function finalizeDocuments(){
             //Print test data
             var div = document.createElement("div");
             document.getElementById("preview").appendChild(div);
+            div.appendChild(document.createTextNode(documents[x].title));
             for (var y = 0; y < keywords.length; y++){
                 div.appendChild(document.createTextNode(documents[x].keywordForces[y] + ", "));
             }
@@ -228,12 +229,17 @@ function averageForce(doc){
 
 //Display and update the progress bar
 var updateProgressBar = function(){
-    document.getElementById("progress").style.display = "block";
+    var progressDisplay = document.getElementById("progressDisplay");
+    progressDisplay.style.display = "block";
     
     var progressBar = document.getElementById("progressBar");
     var width = Math.ceil(documents.length / progressUpdateBound);
     
     progressBar.style.width = width + "%";
     progressBar.innerHTML = width + "%";
+    
+    if (width == 100){
+        progressDisplay.style.display = "none";
+    }
 }
 
