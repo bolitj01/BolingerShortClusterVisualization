@@ -38,63 +38,84 @@ function buildCloud(){
 		}
 	}
 
-	//Place the search terms around the cloud, starting at the initial angle.
-	//TODO: Make dynamic if possible, fix to four for now.
-	/*
-	var numTerms = query.length;
-	var angleOffset = 360/numTerms;
-	//var angleOffset = 45;
-	var angle = initialAngle;
-    searchTermAngles = [];
-	for (i = 0;i < numTerms;i++){
-        searchTermAngles[i] = angle;
-		var res = calculateXYPosition(chartSize/2, toRadians(angle));
-		window.alert("x:"+res[0]+" y:"+res[1]);
+	//Place the search terms/force nodes around the cloud, starting at the top left.
+	var xyCoordinates = determineQueryNodeLocations(numTerms);
 
-		theSVG.append("text")
-			.attr("x", res[0] + (cloudSize/2))
-			.attr("y", res[1] + (cloudSize/2) + fontSize)
-			.attr("font-size", fontSize)
-			.text(query[i]);
-
-		angle += angleOffset;
+	//Draw the labels for the query terms onto the cloud.
+	for(i = 0;i < xyCoordinates.length;i++){
+        theSVG.append("text")
+            .attr("x", xyCoordinates[i][0])
+            .attr("y", xyCoordinates[i][1])
+            .attr("font-size", fontSize)
+            .text(query[i]);
 	}
-	*/
-    var numTerms = query.length;
-    var angleOffset = 360/numTerms;
-    var angle = initialAngle;
-	searchTermAngles = [];
-	for (i = 0;i < numTerms;i++){
-        searchTermAngles[i] = angle;
-        angle += angleOffset;
-	}
-	//Top left (first)
-    theSVG.append("text")
-        .attr("x", marginSize - 20)
-        .attr("y", marginSize)
-        .attr("font-size", fontSize)
-        .text(query[0]);
-    //Top right (second)
-    theSVG.append("text")
-        .attr("x", marginSize + chartSize)
-        .attr("y", marginSize)
-        .attr("font-size", fontSize)
-        .text(query[1]);
-    //Bottom right (third)
-    theSVG.append("text")
-        .attr("x", marginSize + chartSize)
-        .attr("y", marginSize + chartSize + fontSize)
-        .attr("font-size", fontSize)
-        .text(query[2]);
-    //Bottom left (fourth)
-    theSVG.append("text")
-        .attr("x", marginSize - 20)
-        .attr("y", marginSize + chartSize + fontSize)
-        .attr("font-size", fontSize)
-        .text(query[3]);
 
     randomColoring();
+
     //mapData();
+}
+
+function determineQueryNodeLocations(numTerms){
+    //I figured out a better way to traverse the perimeter of a square(clockwise starting from the top left)
+    //to equidistantly(manhattan distance) place force nodes for query terms,
+    //rather than through use of trig functions and polar/Euclidian conversions.
+    var x = 0;
+    var y = 0;
+    var i;
+    var xyCoordinates = [0, 0];
+    var stepSize = (chartSize*4)/numTerms; //4 sides = sum of the sides(perimeter).
+                                       //Dividing by numTerms gives equidistant placements (still need to account for corners)
+    var partway = 0; //Counter to keep track of when we traverse a side length in distance
+    //Start at top left corner.
+    var up = 0, down = 1, left = 2, right = 3, cons = 4;
+    var direction = right;
+
+    for(i = 0;i < numTerms;i++){
+        //Update total distance travelled so far.
+        if(direction == right){
+            x += stepSize;
+        }
+        else if(direction == down){
+            y += stepSize;
+        }
+        else if(direction == left){
+            x -= stepSize;
+        }
+        else if(direction == up){
+            y -= stepSize;
+        }
+        partway+=stepSize;
+
+        //Move as needed around the cloud
+        while (partway > chartSize){
+            //Change directions, set the other value to the known value, then traverse on the other value for the remaining distance.
+            if(direction == right){
+                direction = down;
+                y += (x - chartSize);
+                x = chartSize;
+            }
+            else if(direction == down){
+                direction = left;
+                x -= (y - chartSize);
+                y = chartSize;
+            }
+            else if(direction == left){
+                direction = up;
+                y += x;
+                x = 0;
+            }
+            else if(direction == up){
+                direction = right;
+                x -= y;
+                y = 0;
+            }
+            partway -= chartSize;
+        }
+
+        //Mark this point as a coordinate for a query term.
+        xyCoordinates[i] = [x + marginSize, y + marginSize]; //Adjust by the offset for margins here.
+    }
+    return xyCoordinates;
 }
 
 function mapData(){
@@ -105,57 +126,9 @@ function mapData(){
 	}
 }
 
-//Plots the raw points to the svg. For testing mainly.
+//TODO: Plots the raw points to the svg.
 function plotPoints(){
 
-}
-
-//TODO: This doesn't seem to work.
-function determineXYLocation(document){
-	//Determine the maximum of the force values here
-	var max = -1;
-	var i;
-	for(i = 0;i < query.length;i++){
-        if(document.keywordForces[i] > max){
-        	max = document.keywordForces[i];
-		}
-	}
-
-	//Average x values
-	var x = 0;
-	for (i = 0;i < query.length;i++){
-		if(i == 0 || i == 3) {
-            x = x - (document.keywordForces[i] / max) * (chartSize / 2);
-        }
-        else {
-            x = x + (document.keywordForces[i] / max) * (chartSize / 2);
-		}
-	}
-	if(x > (chartSize / 2)){
-		x = (chartSize / 2);
-	}
-	if(x < -1 * (chartSize / 2)){
-        x = -1 * (chartSize / 2);
-	}
-
-	//Average y values
-    var y = 0;
-    for (i = 0;i < query.length;i++){
-        if(i == 0 || i == 1) {
-            y = y - (document.keywordForces[i] / max) * (chartSize / 2);
-        }
-        else {
-            y = y + (document.keywordForces[i] / max) * (chartSize / 2);
-        }
-    }
-    if(y > (chartSize / 2)){
-        y = (chartSize / 2);
-    }
-    if(y < -1 * (chartSize / 2)){
-        y = -1 * (chartSize / 2);
-    }
-
-	return [x, y]; //This is relative to the center of the chart.
 }
 
 //Proof of concept, Not enough time to do more at the moment.
@@ -171,6 +144,7 @@ function randomColoring(){
 }
 
 //TODO: Map 8 triangles to square positions. Can use this for force mapping too.
+//Current State: Unfinished, partially implemented.
 function calculateXYPosition(side, angle){
 	if(angle <= toRadians(45)) {
         var y = Math.tan(angle) * side;
