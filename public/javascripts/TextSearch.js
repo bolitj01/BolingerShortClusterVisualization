@@ -3,6 +3,8 @@
 var query = []; //Search terms
 var keywords;
 
+var globalCounts = {}; //Temporary counter of all words to identify most popular terms
+
 var documents = [];
 var docKeywordCounts;
 
@@ -137,10 +139,17 @@ function read(event, file){
     var totalWords = 0;
     var found = false;
 
+    var globalFound = false; //testing popular words
+    
     //Count words and keyword occurrences
     for (var x = 0; x < words.length; x++){
         for (var y = 0; y < keywords.length; y++){
-            if (words[x].toLowerCase().includes(keywords[y].name)){
+            //Set word to lower case and remove all punctuation and whitespace
+            var word = words[x].toLowerCase();
+            word = word.replace(/[\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,\-.\/:;<=>?@\[\]^_`{|}~]/, "");
+            word = word.trim();
+            
+            if (word.includes(keywords[y].name)){
                 docKeywordCounts[y]++;
                 if (!found){
                     keywords[y].corpusCount++;
@@ -148,6 +157,21 @@ function read(event, file){
                 }
             }
             totalWords++;
+            
+            //globalCount
+            if (globalCounts[word] == undefined){
+                globalCounts[word] = [];
+                globalCounts[word].push(0); //word count
+                globalCounts[word].push(0); //document count
+            }
+            else{
+                globalCounts[word][0] += 1;
+            }
+            
+            if (!globalFound){
+                globalCounts[word][1] += 1;
+                globalFound = true;
+            }
         }
     }
 
@@ -167,29 +191,46 @@ function read(event, file){
 
 function finalizeDocuments(){
     
+    //Reset force range
+    forceRange = 0;
+
+    for (var x = 0; x < documents.length; x++){
+        documents[x].calculateTFIDF();
+        documents[x].calculateForces();
+    }
+
+    sortDocuments();
+
+    var globalCountsList = [];
+    for (var word in globalCounts){
+        globalCountsList.push([word, globalCounts[word]]);
+    }
     
-//    if (documents.length == corpusTotal){
-        
-        //Reset force range
-        forceRange = 0;
-        
-        for (var x = 0; x < documents.length; x++){
-            documents[x].calculateTFIDF();
-            documents[x].calculateForces();
+    globalCountsList.sort(function(a, b) {
+        return b[1][0] - a[1][0];
+    });
+
+    //Print counts list
+    for (var x = 0; x < 200; x++){
+        var div = document.createElement("div");
+        document.getElementById("preview").appendChild(div);
+        div.appendChild(document.createTextNode(globalCountsList[x]));
+//        for (var y = 0; y < keywords.length; y++){
+//            div.appendChild(document.createTextNode(documents[x].keywordForces[y] + ", "));
+//        }
+        document.getElementById("preview").appendChild(document.createElement("br"));
+    }
+    
+    //Print document data
+    for (var x = 0; x < documents.length; x++){
+        var div = document.createElement("div");
+        document.getElementById("preview").appendChild(div);
+        div.appendChild(document.createTextNode(documents[x].title));
+        for (var y = 0; y < keywords.length; y++){
+            div.appendChild(document.createTextNode(documents[x].keywordForces[y] + ", "));
         }
-         
-        sortDocuments();
-        
-        for (var x = 0; x < documents.length; x++){
-            //Print test data
-            var div = document.createElement("div");
-            document.getElementById("preview").appendChild(div);
-            div.appendChild(document.createTextNode(documents[x].title));
-            for (var y = 0; y < keywords.length; y++){
-                div.appendChild(document.createTextNode(documents[x].keywordForces[y] + ", "));
-            }
-            document.getElementById("preview").appendChild(document.createElement("br"));
-        }
+        document.getElementById("preview").appendChild(document.createElement("br"));
+    }
 //    }    
 //    else{
 //        var div = document.createElement("div");
