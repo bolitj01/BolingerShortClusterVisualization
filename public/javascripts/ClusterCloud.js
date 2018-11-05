@@ -12,37 +12,38 @@ var nodes = []; //A node represents either a search term, or a document. Search 
 var links = []; //Links between two nodes. Used to define the force towards each search term around the cloud.
 
 //Draws the outline.
-function buildCloud(){
-	//TODO:Clear anything existing, we're starting from scratch.
+function buildCloud() {
+    //TODO:Clear anything existing, we're starting from scratch.
 
-	//Get the svg object from the DOM.
-	var theSVG = d3.select("svg")
-	.attr("width", cloudSize) 
-	.attr("height", cloudSize); 
+    //Get the svg object from the DOM.
+    var theSVG = d3.select("svg")
+        .attr("width", cloudSize)
+        .attr("height", cloudSize);
 
-	//Determine step size
-	var stepSize = chartSize/numRowsCols;
+    //Determine step size
+    var stepSize = chartSize / numRowsCols;
 
-	//Build each section, forming a 2D array.
-	var i, j, k;
-	for (i = 0;i < numRowsCols; i++) {
-		for (j = 0;j < numRowsCols; j++) {
-			var sect = theSVG.append("rect")
-			.attr("x", (j * stepSize) + marginSize)
-			.attr("y", (i * stepSize) + marginSize)
-			.attr("width", stepSize)
-			.attr("height", stepSize)
-			.attr("fill", "white")
-			.attr("id", "r"+ i + ""+ j)
-			.attr("stroke", "black");
-		}
-	}
+    //Build each section, forming a 2D array.
+    var i, j, k;
+    for (i = 0; i < numRowsCols; i++) {
+        for (j = 0; j < numRowsCols; j++) {
+            var sect = theSVG.append("rect")
+                .attr("x", (j * stepSize) + marginSize)
+                .attr("y", (i * stepSize) + marginSize)
+                .attr("width", stepSize)
+                .attr("height", stepSize)
+                .attr("fill", "white")
+                .attr("id", "r" + i + "" + j)
+                .attr("stroke", "black");
+        }
+    }
 
-	//Place the search terms/force nodes around the cloud, starting at the top left.
-	var xyCoordinates = determineQueryNodeLocations(numTerms);
+    //Place the search terms/force nodes around the cloud, starting at the top left.
+    var numTerms = query.length;
+    var xyCoordinates = determineQueryNodeLocations(numTerms);
 
-	//Draw the labels for the query terms onto the cloud.
-	for(i = 0;i < xyCoordinates.length;i++){
+    //Draw the labels for the query terms onto the cloud.
+    for (i = 0; i < xyCoordinates.length; i++) {
         theSVG.append("text")
             .attr("x", xyCoordinates[i][0])
             .attr("y", xyCoordinates[i][1])
@@ -51,17 +52,41 @@ function buildCloud(){
 
         //Create a node for the search term and fix it's x and y locations.
         nodes.push({"id": query[i]});
-        //A note: if I'm offsetting by marginSize in determineQueryNodeLocations these values need to be adjusted accordingly.
-        nodes[nodes.length - 1].fx = xyCoordinates[i][0];
-        nodes[nodes.length - 1].fy = xyCoordinates[i][1];
-	}
+        //A note: if I'm offsetting by marginSize in determineQueryNodeLocations these values may need to be adjusted accordingly.
+        nodes[i].fx = xyCoordinates[i][0];
+        nodes[i].fy = xyCoordinates[i][1];
+    }
 
-	//TODO: Create a node for every document in the corpus.
+    //Create a node for every document in the corpus.
+    for (i = 0; i < documents.length; i++) {
+        nodes.push({"id": documents[i].title});
+    }
 
-    //TODO: Create a link between each search term and every document, and set the link force between them
+    //Create a link between each search term and every document, and set the link force between them
     //to be proportional to their relative TF-IDF scores. Direction: Document -> Search Term
+    for (i = 0; i < documents.length; i++) {
+        for(j = 0;j < query.length;j++){
+            //TODO: Scaling for force value?
+            nodes.push({"source": documents[i].title, "target": query[j], "strength": documents[i].keywordForces[j]});
+        }
+    }
 
     //TODO: Create the D3 force directed graph and set all necessary nodes/links/and forces.
+    var force = d3.layout.force()
+        .size([chartSize, chartSize])
+        .nodes(d3.values(nodes))
+        .links(links)
+        .on("tick", tick)
+        .linkDistance(0)
+        .start();
+
+    var simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).strength(function(d) {return d.strength;}))
+        .stop();
+
+    function tick(e) {
+
+    }
 
     //TODO: Execute the simulation for n number of iterations
 
@@ -110,7 +135,7 @@ function buildCloud(){
         }
     }
 
-    //randomColoring();
+    randomColoring();
 }
 
 //Returns the xy positions for every search term. They are arrayed, equidistantly, around the cloud.
