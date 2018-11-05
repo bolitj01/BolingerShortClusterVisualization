@@ -1,6 +1,3 @@
-var initialAngle = 0; //Initial angle in degrees, used to determine word placement around the cloud
-//var searchTermAngles = [45, 105, 225, 315]; //Corresponding angle for each search term
-var searchTermAngles;
 var marginSize = 100;
 var chartSize = 800;
 var cloudSize = chartSize + (2 * marginSize); //(border on left/right above/below)
@@ -10,6 +7,9 @@ var mapColors = ["blue", "purple", "red", "white"];
 
 //array to keep track of # docs -> spaces
 var mappingCounts;
+
+var nodes = []; //A node represents either a search term, or a document. Search terms are fixed position around the cloud.
+var links = []; //Links between two nodes. Used to define the force towards each search term around the cloud.
 
 //Draws the outline.
 function buildCloud(){
@@ -24,7 +24,7 @@ function buildCloud(){
 	var stepSize = chartSize/numRowsCols;
 
 	//Build each section, forming a 2D array.
-	var i = 0; j = 0;
+	var i, j, k;
 	for (i = 0;i < numRowsCols; i++) {
 		for (j = 0;j < numRowsCols; j++) {
 			var sect = theSVG.append("rect")
@@ -48,13 +48,72 @@ function buildCloud(){
             .attr("y", xyCoordinates[i][1])
             .attr("font-size", fontSize)
             .text(query[i]);
+
+        //Create a node for the search term and fix it's x and y locations.
+        nodes.push({"id": query[i]});
+        //A note: if I'm offsetting by marginSize in determineQueryNodeLocations these values need to be adjusted accordingly.
+        nodes[nodes.length - 1].fx = xyCoordinates[i][0];
+        nodes[nodes.length - 1].fy = xyCoordinates[i][1];
 	}
 
-    randomColoring();
+	//TODO: Create a node for every document in the corpus.
 
-    //mapData();
+    //TODO: Create a link between each search term and every document, and set the link force between them
+    //to be proportional to their relative TF-IDF scores. Direction: Document -> Search Term
+
+    //TODO: Create the D3 force directed graph and set all necessary nodes/links/and forces.
+
+    //TODO: Execute the simulation for n number of iterations
+
+    //Now we have an x and y position for every node in the graph. For every (x, y) determine if that value falls
+    //within the boundaries for each given section.
+    var curX, curY = 0;
+    //Loop over the height(rows) of the cloud.
+    for(i = 0;i < numRowsCols;i++){
+        curX = 0;
+        //Loop over the width(columns) of the cloud.
+	    for(j = 0;j < numRowsCols;j++){
+	        //Loop over every node that isn't a search term (a document in the corpus).
+            for(k = numTerms;k < nodes.length;k++){ //Start at numTerms to skip all query term nodes.
+                //Known bug: this will have some small overlap in the incredibly miniscule chance that a value falls perfectly between two chunks.
+                //Current status: Left as is, avoids needing special processing for last row/col.
+                if(nodes[k].x >= curX && nodes[k].x <= (curX + stepSize) && nodes[k].y >= curY && nodes[k].y <= (curY + stepSize)){
+                    mappingCounts[i][j]++;
+                }
+            }
+            curX += stepSize;
+        }
+        curY += stepSize;
+    }
+
+    //Now that we have a number of counts, determine the max and min values.
+    var minCount = mappingCounts[0][0]; //Default to a given element of the 2D array.
+    var maxCount = mappingCounts[0][0];
+    for(i = 0;i < numRowsCols;i++) {
+        for (j = 0; j < numRowsCols; j++) {
+            if(mappingCounts[i][j] > maxCount){
+                maxCount = mappingCounts[i][j];
+            }
+            if(mappingCounts[i][j] < minCount){
+                minCount = mappingCounts[i][j];
+            }
+        }
+    }
+
+    //Map these values to colors, and color the svg accordingly.
+    for(i = 0;i < numRowsCols;i++) {
+        for (j = 0; j < numRowsCols; j++) {
+            //Logically we're shifting the minimum to the "zero", finding out what percentage of the maximum we have in this section
+            //and then multiplying that value by the number of available colors - 1 (indexing). Last, we floor the entire calculation.
+            var colorIndex = Math.floor(((mappingCounts[i][j] - minCount) / (maxCount - minCount)) * (mapColors.length - 1));
+            colorCloudSection(i, j, colorIndex);
+        }
+    }
+
+    //randomColoring();
 }
 
+//Returns the xy positions for every search term. They are arrayed, equidistantly, around the cloud.
 function determineQueryNodeLocations(numTerms){
     //I figured out a better way to traverse the perimeter of a square(clockwise starting from the top left)
     //to equidistantly(manhattan distance) place force nodes for query terms,
@@ -118,35 +177,43 @@ function determineQueryNodeLocations(numTerms){
     return xyCoordinates;
 }
 
-function mapData(){
-	var i;
-	for(i = 0;i < documents.length;i++){
-		var res = determineXYLocation(documents[i]);
-		window.alert("x: "+res[0]+" y:"+res[1]);
-	}
-}
-
-//TODO: Plots the raw points to the svg.
-function plotPoints(){
+//TODO: Implement a force directed graph
+function createGraph(){
+    //create a force directed graph
+    var force = d3.layout.force()
+        .size([chartSize, chartSize])
+        .nodes(d3.values(nodes))
+        .links(links)
+        .on("tick", tick)
 
 }
 
-//Proof of concept, Not enough time to do more at the moment.
+//Proof of concept. Randomly colors sections to show what layouts COULD look like.
 function randomColoring(){
 	var i = 0;
 	var j = 0;
 	for(i = 0;i < numRowsCols;i++){
 		for(j = 0;j < numRowsCols;j++){
-			var rand = Math.random() * 6;
-            colorCloudSection(i, j, mapColors[Math.floor(rand)]);
+			var rand = Math.random() * mapColors.length;
+            colorCloudSection(i, j, Math.floor(rand));
 		}
 	}
+}
+
+//Simple function to convert degrees to radians.
+function toRadians (angle) {
+	return angle * (Math.PI/180);
+}
+
+//Colors a single section of the chart a given color.
+function colorCloudSection(x, y, colorIndex){
+	d3.select("svg").select("#r"+x+""+y).style("fill", mapColors[colorIndex]);
 }
 
 //TODO: Map 8 triangles to square positions. Can use this for force mapping too.
 //Current State: Unfinished, partially implemented.
 function calculateXYPosition(side, angle){
-	if(angle <= toRadians(45)) {
+    if(angle <= toRadians(45)) {
         var y = Math.tan(angle) * side;
         var x = side;
         return [x, y];
@@ -155,8 +222,8 @@ function calculateXYPosition(side, angle){
         var x = side / Math.tan(angle);
         var y = side;
         return [x, y];
-	}
-	else if(angle <= toRadians(135)){
+    }
+    else if(angle <= toRadians(135)){
         angle = angle - toRadians(90);
         var y = Math.tan(angle) * side;
         var x = side * -1;
@@ -168,13 +235,4 @@ function calculateXYPosition(side, angle){
         var y = side * -1;
         return [x, y];
     }
-}
-
-function toRadians (angle) {
-	return angle * (Math.PI/180);
-}
-
-//Colors a single section of the chart a given color.
-function colorCloudSection(x, y, color){
-	d3.select("svg").select("#r"+x+""+y).style("fill", color);
 }
