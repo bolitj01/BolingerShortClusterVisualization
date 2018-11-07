@@ -146,7 +146,7 @@ function read(event, file){
         for (var y = 0; y < keywords.length; y++){
             //Set word to lower case and remove all punctuation and whitespace
             var word = words[x].toLowerCase();
-            word = word.replace(/[\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,\-.\/:;<=>?@\[\]^_`{|}~]/, "");
+            word = word.replace(/[\u2000-\u206F\u2E00-\u2E7F\\!"#$%&()*+,\-.\/:;<=>?@\[\]^_`{|}~]/, "");
             word = word.trim();
             
             if (word.includes(keywords[y].name)){
