@@ -3,46 +3,59 @@ var chartSize = 800;
 var cloudSize = chartSize + (2 * marginSize); //(border on left/right above/below)
 var fontSize = 20;
 var numRowsCols = 10; //Keep rows == columns
-var mapColors = ["blue", "purple", "red", "white"];
+var mapColors = ["blue", "purple", "red"];
+
+var numFDGIterations = 300; //How many times are we updating node positions based off of forces?
 
 //array to keep track of # docs -> spaces
-var mappingCounts;
+var mappingCounts =[];
 
 var nodes = []; //A node represents either a search term, or a document. Search terms are fixed position around the cloud.
 var links = []; //Links between two nodes. Used to define the force towards each search term around the cloud.
 
+//Not my code, from: https://stackoverflow.com/questions/16873323/javascript-sleep-wait-before-continuing
+function sleep(milliseconds) {
+    var start = new Date().getTime();
+    for (var i = 0; i < 1e7; i++) {
+        if ((new Date().getTime() - start) > milliseconds){
+            break;
+        }
+    }
+}
+
 //Draws the outline.
-function buildCloud(){
-	//TODO:Clear anything existing, we're starting from scratch.
+function buildCloud() {
+    //TODO:Clear anything existing, we're starting from scratch.
 
-	//Get the svg object from the DOM.
-	var theSVG = d3.select("svg")
-	.attr("width", cloudSize) 
-	.attr("height", cloudSize); 
+    //Get the svg object from the DOM.
+    var theSVG = d3.select("svg")
+        .attr("width", cloudSize)
+        .attr("height", cloudSize);
 
-	//Determine step size
-	var stepSize = chartSize/numRowsCols;
+    //Determine step size and total number of query terms
+    var stepSize = chartSize / numRowsCols;
+    var numTerms = query.length;
 
-	//Build each section, forming a 2D array.
-	var i, j, k;
-	for (i = 0;i < numRowsCols; i++) {
-		for (j = 0;j < numRowsCols; j++) {
-			var sect = theSVG.append("rect")
-			.attr("x", (j * stepSize) + marginSize)
-			.attr("y", (i * stepSize) + marginSize)
-			.attr("width", stepSize)
-			.attr("height", stepSize)
-			.attr("fill", "white")
-			.attr("id", "r"+ i + ""+ j)
-			.attr("stroke", "black");
-		}
-	}
+    //Build each section, forming a 2D array.
+    var i, j, k;
+    for (i = 0; i < numRowsCols; i++) {
+        for (j = 0; j < numRowsCols; j++) {
+            var sect = theSVG.append("rect")
+                .attr("x", (j * stepSize) + marginSize)
+                .attr("y", (i * stepSize) + marginSize)
+                .attr("width", stepSize)
+                .attr("height", stepSize)
+                .attr("fill", "white")
+                .attr("id", "r" + i + "" + j)
+                .attr("stroke", "black");
+        }
+    }
 
-	//Place the search terms/force nodes around the cloud, starting at the top left.
-	var xyCoordinates = determineQueryNodeLocations(numTerms);
+    //Place the search terms/force nodes around the cloud, starting at the top left.
+    var xyCoordinates = determineQueryNodeLocations(numTerms);
 
-	//Draw the labels for the query terms onto the cloud.
-	for(i = 0;i < xyCoordinates.length;i++){
+    //Draw the labels for the query terms onto the cloud.
+    for (i = 0; i < xyCoordinates.length; i++) {
         theSVG.append("text")
             .attr("x", xyCoordinates[i][0])
             .attr("y", xyCoordinates[i][1])
@@ -51,19 +64,47 @@ function buildCloud(){
 
         //Create a node for the search term and fix it's x and y locations.
         nodes.push({"id": query[i]});
-        //A note: if I'm offsetting by marginSize in determineQueryNodeLocations these values need to be adjusted accordingly.
-        nodes[nodes.length - 1].fx = xyCoordinates[i][0];
-        nodes[nodes.length - 1].fy = xyCoordinates[i][1];
-	}
+        //A note: if I'm offsetting by marginSize in determineQueryNodeLocations these values may need to be adjusted accordingly.
+        nodes[i].fx = xyCoordinates[i][0] - marginSize;
+        nodes[i].fy = xyCoordinates[i][1] - marginSize;
+        nodes[i].x = xyCoordinates[i][0] - marginSize;
+        nodes[i].y = xyCoordinates[i][1] - marginSize;
+        console.log(nodes[i].fx);
+        console.log(nodes[i].fy);
+    }
 
-	//TODO: Create a node for every document in the corpus.
+    //Create a node for every document in the corpus.
+    for (i = 0; i < documents.length; i++) {
+        nodes.push({"id": documents[i].title});
+        nodes[i + numTerms].x = chartSize/2;
+        nodes[i + numTerms].y = chartSize/2;
+    }
 
-    //TODO: Create a link between each search term and every document, and set the link force between them
+    //Create a link between each search term and every document, and set the link force between them
     //to be proportional to their relative TF-IDF scores. Direction: Document -> Search Term
+    var scalingFactor = 1/forceRange;
+    console.log(scalingFactor);
+    console.log(forceRange);
+    for (i = 0; i < documents.length; i++) {
+        for(j = 0;j < query.length;j++){
+            //TODO: Scaling for force value? Scaling factor: 1/MAX_TFIDF, to get force multiply this by documents[i].keywordForces[j]
+            links.push({"source": (i + numTerms), "target": j, "strength": (documents[i].keywordForces[j] * scalingFactor)});
+            console.log("source: " + (i + numTerms) + "target: " + j + "strength: " + (documents[i].keywordForces[j] * scalingFactor));
+        }
+    }
 
-    //TODO: Create the D3 force directed graph and set all necessary nodes/links/and forces.
+    //Create the D3 force directed graph and set all necessary nodes/links/and forces.
+    var simulation = d3.forceSimulation(nodes)
+        .force("charge", null)
+        .force("center", null)
+        .force("collide", null)
+        .force("link", d3.forceLink(links).distance(0).strength(function(d) {return d.strength;})).stop();
 
-    //TODO: Execute the simulation for n number of iterations
+    // See https://github.com/d3/d3-force/blob/master/README.md#simulation_tick
+    //Run the simulation until satisfactory convergence.
+    for (i = 0, n = Math.ceil(Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay())); i < n; ++i) {
+        simulation.tick();
+    }
 
     //Now we have an x and y position for every node in the graph. For every (x, y) determine if that value falls
     //within the boundaries for each given section.
@@ -71,16 +112,20 @@ function buildCloud(){
     //Loop over the height(rows) of the cloud.
     for(i = 0;i < numRowsCols;i++){
         curX = 0;
+        mappingCounts.push([]);
         //Loop over the width(columns) of the cloud.
 	    for(j = 0;j < numRowsCols;j++){
+	        mappingCounts[i][j] = 0;
 	        //Loop over every node that isn't a search term (a document in the corpus).
             for(k = numTerms;k < nodes.length;k++){ //Start at numTerms to skip all query term nodes.
-                //Known bug: this will have some small overlap in the incredibly miniscule chance that a value falls perfectly between two chunks.
+                //console.log(nodes[k].x, nodes[k].y);
+                //Known bug: this will have some small overlap in the incredibly miniscule chance that a value falls perfectly between two(four in the rarer case of a corner) chunks.
                 //Current status: Left as is, avoids needing special processing for last row/col.
                 if(nodes[k].x >= curX && nodes[k].x <= (curX + stepSize) && nodes[k].y >= curY && nodes[k].y <= (curY + stepSize)){
                     mappingCounts[i][j]++;
                 }
             }
+            console.log(mappingCounts[i][j]);
             curX += stepSize;
         }
         curY += stepSize;
@@ -115,7 +160,7 @@ function buildCloud(){
 
 //Returns the xy positions for every search term. They are arrayed, equidistantly, around the cloud.
 function determineQueryNodeLocations(numTerms){
-    //I figured out a better way to traverse the perimeter of a square(clockwise starting from the top left)
+    //I figured out a better way to traverse the perimeter of a square(clockwise starting from the top left - the offset is incurred immediately so the first point isn't placed there)
     //to equidistantly(manhattan distance) place force nodes for query terms,
     //rather than through use of trig functions and polar/Euclidian conversions.
     var x = 0;
