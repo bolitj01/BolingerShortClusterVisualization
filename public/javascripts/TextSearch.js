@@ -22,8 +22,12 @@ function Document(id, title, totalWords, keywordCounts){
     //this.date = date; would be nice to use eventually for transparency
     
     this.totalWords = totalWords;
-    
-    this.keywordCounts = keywordCounts;
+
+    //Fixed to a deep copy.
+    this.keywordCounts = [];
+    for(var i = 0;i < keywordCounts.length;i++){
+        this.keywordCounts.push(keywordCounts[i]);
+    }
     
     this.keywordForces = [];
     this.keywordTFIDFs = [];
@@ -32,21 +36,25 @@ function Document(id, title, totalWords, keywordCounts){
     //The corpus must be fully searched before calling this on each document,
     //or the idf value will be incorrect.
     this.calculateTFIDF = function(){
-        for (var i = 0; i < keywordCounts.length; i++){
+        for (var i = 0; i < this.keywordCounts.length; i++){
             //Term frequency
-            var tf = keywordCounts[i] / totalWords;
+            var tf = this.keywordCounts[i] / totalWords;
             
             //Inverse document frequency
             var idf = Math.log(documents.length / keywords[i].corpusCount);
             
-            this.keywordTFIDFs[i] = tf * idf;
+            //this.keywordTFIDFs[i] = tf * idf;
+            this.keywordTFIDFs[i] = tf; //TODO: I think we actually just need term frequency per document. Why should
+                                        //other documents affect the positioning of a singular one? We're just interested
+                                        //in relative force compared to other search terms for placement concerning only
+                                        //an individual document.
         }
     };
     
     //Calculates the force for each keyword node in the force-directed graph
     //Currently just returns the TFIDF value
     this.calculateForces = function(){
-        for (var i = 0; i < keywordCounts.length; i++){
+        for (var i = 0; i < this.keywordCounts.length; i++){
             this.keywordForces[i] = this.keywordTFIDFs[i];
             if (this.keywordForces[i] > forceRange){
                 forceRange = this.keywordForces[i];
@@ -121,8 +129,14 @@ function read(event, file){
 
     //Get contents and split by word and line
     var contents = event.target.result;
-    var words = contents.split(" ")
-    var lines = contents.split("\n")
+    var lines = contents.split("\n");
+    var words = [];
+    for(var i = 0;i < lines.length;i++) {
+        var lineWords = lines[i].split(" ");
+        for (var j = 0; j < lineWords.length; j++) {
+            words.push(lineWords[j]);
+        }
+    }
 
     //Parse title
     //Every title is within the first 20 lines. Some documents have more than one title, currently just read first one as document title.
@@ -136,27 +150,28 @@ function read(event, file){
 
     //Reset document counts
     docKeywordCounts.fill(0);
-    var totalWords = 0;
-    var found = false;
+    var found = [];
+    for(var i = 0;i < keywords.length;i++){
+        found.push(false);
+    }
 
     var globalFound = false; //testing popular words
     
     //Count words and keyword occurrences
     for (var x = 0; x < words.length; x++){
+        //Set word to lower case and remove all punctuation and whitespace
+        var word = words[x].toLowerCase();
+        word = word.replace(/[\u2000-\u206F\u2E00-\u2E7F\\!"#$%&()*+,\-.\/:;<=>?@\[\]^_`{|}~]/, "");
+        word = word.trim();
+
         for (var y = 0; y < keywords.length; y++){
-            //Set word to lower case and remove all punctuation and whitespace
-            var word = words[x].toLowerCase();
-            word = word.replace(/[\u2000-\u206F\u2E00-\u2E7F\\!"#$%&()*+,\-.\/:;<=>?@\[\]^_`{|}~]/, "");
-            word = word.trim();
-            
             if (word.includes(keywords[y].name)){
                 docKeywordCounts[y]++;
-                if (!found){
+                if (!found[y]){
                     keywords[y].corpusCount++;
-                    found = true;
+                    found[y] = true;
                 }
             }
-            totalWords++;
             
             //globalCount
             if (globalCounts[word] == undefined){
@@ -175,7 +190,9 @@ function read(event, file){
         }
     }
 
-    var doc = new Document(filename, title, totalWords, docKeywordCounts);
+    //console.log(docKeywordCounts);
+
+    var doc = new Document(filename, title, words.length, docKeywordCounts);
     documents.push(doc);
     
     //Update each 1% of the progress bar
@@ -189,19 +206,20 @@ function read(event, file){
     }
 }
 
-function finalizeDocuments(){
-    
+function finalizeDocuments() {
+
     //Reset force range
     forceRange = 0;
 
-    for (var x = 0; x < documents.length; x++){
+    for (var x = 0; x < documents.length; x++) {
         documents[x].calculateTFIDF();
         documents[x].calculateForces();
     }
 
-    sortDocuments();
+    //sortDocuments();
 
     var globalCountsList = [];
+
     for (var word in globalCounts){
         globalCountsList.push([word, globalCounts[word]]);
     }
@@ -211,7 +229,8 @@ function finalizeDocuments(){
     });
 
     //Print counts list
-    for (var x = 0; x < 200; x++){
+    /*
+    for (var x = 0; x < globalCountsList.length; x++){
         var div = document.createElement("div");
         document.getElementById("preview").appendChild(div);
         div.appendChild(document.createTextNode(globalCountsList[x]));
@@ -220,12 +239,13 @@ function finalizeDocuments(){
 //        }
         document.getElementById("preview").appendChild(document.createElement("br"));
     }
+    */
     
     //Print document data
     for (var x = 0; x < documents.length; x++){
         var div = document.createElement("div");
         document.getElementById("preview").appendChild(div);
-        div.appendChild(document.createTextNode(documents[x].title));
+        div.appendChild(document.createTextNode(documents[x].id));
         for (var y = 0; y < keywords.length; y++){
             div.appendChild(document.createTextNode(documents[x].keywordForces[y] + ", "));
         }

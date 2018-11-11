@@ -7,11 +7,11 @@ var mapColors = ["blue", "purple", "red"];
 
 var numFDGIterations = 300; //How many times are we updating node positions based off of forces?
 
-//array to keep track of # docs -> spaces
-var mappingCounts =[];
-
+var mappingCounts = []; //array to keep track of # docs -> spaces
 var nodes = []; //A node represents either a search term, or a document. Search terms are fixed position around the cloud.
-var links = []; //Links between two nodes. Used to define the force towards each search term around the cloud.
+var links = []; //Links between two nodes.
+
+var outlineCreated = false;
 
 //Not my code, from: https://stackoverflow.com/questions/16873323/javascript-sleep-wait-before-continuing
 function sleep(milliseconds) {
@@ -23,10 +23,14 @@ function sleep(milliseconds) {
     }
 }
 
-//Draws the outline.
-function buildCloud() {
-    //TODO:Clear anything existing, we're starting from scratch.
+//TODO: Reset everything to be empty prior to generating a new view.
+function clearCloud(){
+    mappingCounts = [];
+    nodes = [];
+    links = [];
+}
 
+function buildOutline() {
     //Get the svg object from the DOM.
     var theSVG = d3.select("svg")
         .attr("width", cloudSize)
@@ -50,6 +54,23 @@ function buildCloud() {
                 .attr("stroke", "black");
         }
     }
+}
+
+//Draws the outline.
+function buildCloud() {
+    //Clear anything existing, we're starting from scratch.
+    clearCloud();
+
+    if(!outlineCreated){
+        buildOutline();
+        outlineCreated = true;
+    }
+
+    //Determine step size and total number of query terms
+    var stepSize = chartSize / numRowsCols;
+    var numTerms = query.length;
+
+    var theSVG = d3.select("svg");
 
     //Place the search terms/force nodes around the cloud, starting at the top left.
     var xyCoordinates = determineQueryNodeLocations(numTerms);
@@ -83,13 +104,12 @@ function buildCloud() {
     //Create a link between each search term and every document, and set the link force between them
     //to be proportional to their relative TF-IDF scores. Direction: Document -> Search Term
     var scalingFactor = 1/forceRange;
-    console.log(scalingFactor);
-    console.log(forceRange);
+
     for (i = 0; i < documents.length; i++) {
         for(j = 0;j < query.length;j++){
             //TODO: Scaling for force value? Scaling factor: 1/MAX_TFIDF, to get force multiply this by documents[i].keywordForces[j]
             links.push({"source": (i + numTerms), "target": j, "strength": (documents[i].keywordForces[j] * scalingFactor)});
-            console.log("source: " + (i + numTerms) + "target: " + j + "strength: " + (documents[i].keywordForces[j] * scalingFactor));
+            //console.log("source: " + (i + numTerms) + "target: " + j + "strength: " + (documents[i].keywordForces[j] * scalingFactor * superScalingFactor));
         }
     }
 
@@ -98,12 +118,47 @@ function buildCloud() {
         .force("charge", null)
         .force("center", null)
         .force("collide", null)
-        .force("link", d3.forceLink(links).distance(0).strength(function(d) {return d.strength;})).stop();
+        .force("manyBody", null)
+        .force("link", d3.forceLink(links).distance(10).strength(function(d) {return d.strength;}))
+        .stop();
 
     // See https://github.com/d3/d3-force/blob/master/README.md#simulation_tick
     //Run the simulation until satisfactory convergence.
     for (i = 0, n = Math.ceil(Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay())); i < n; ++i) {
         simulation.tick();
+    }
+
+    console.log("Number of iterations: " + i);
+
+    //Debug output
+    for(i = 0;i < nodes.length;i++){
+        console.log("x: "+ nodes[i].x + " y: " + nodes[i].y);
+    }
+
+    //There is no guarantee that the force layout kept the nodes within the bounding box, simply linearly push any that
+    //remain out of bounds at convergence to be within the x/y limits.
+    for(i = 0;i < nodes.length;i++){
+        var nodeChanged = false;
+        if(nodes[i].x < 0){
+            nodes[i].x = 0;
+            nodeChanged = true;
+        }
+        if(nodes[i].y < 0){
+            nodes[i].y = 0;
+            nodeChanged = true;
+        }
+        if(nodes[i].x > chartSize){
+            nodes[i].x = chartSize;
+            nodeChanged = true;
+        }
+        if(nodes[i].y > chartSize) {
+            nodes[i].y = chartSize;
+            nodeChanged = true;
+        }
+        //TODO: Update any links to have correct x,y locations for a node that was changed.
+        if(nodeChanged){
+
+        }
     }
 
     //Now we have an x and y position for every node in the graph. For every (x, y) determine if that value falls
@@ -159,6 +214,9 @@ function buildCloud() {
 }
 
 //Returns the xy positions for every search term. They are arrayed, equidistantly, around the cloud.
+//This is a somewhat fixed solution for n = 4. I'd think there exists some generic solution for any n (limit at infinity would equate to
+//traveling the circumference of a circle). Basically your step size would become increasingly smaller, and the direction to move would
+//be percentages of x/y instead of this fixed full y/x movement for a square. For simplicities sake though, I'm no longer working on this.
 function determineQueryNodeLocations(numTerms){
     //I figured out a better way to traverse the perimeter of a square(clockwise starting from the top left - the offset is incurred immediately so the first point isn't placed there)
     //to equidistantly(manhattan distance) place force nodes for query terms,
