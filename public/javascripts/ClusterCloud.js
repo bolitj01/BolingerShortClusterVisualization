@@ -3,7 +3,15 @@ var chartSize = 800;
 var cloudSize = chartSize + (2 * marginSize); //(border on left/right above/below)
 var fontSize = 20;
 var numRowsCols = 10; //Keep rows == columns
-var mapColors = ["blue", "purple", "red"];
+//var mapColors = ["blue", "purple", "red"];
+
+//From: http://www.perbang.dk/rgbgradient/ {
+//Scaled from pure blue to pure red.
+//This can be dynamically done too from 2 given colors, then linearly interpolate between them (nuuu trig T_T)
+var mapColors = ["0000FF", "1C00E2", "3800C6", "5500AA", "71008D", "8D0071", "AA0055", "C60038", "E2001C", "FF0000"];
+//}
+
+
 
 var numFDGIterations = 300; //How many times are we updating node positions based off of forces?
 
@@ -13,21 +21,33 @@ var links = []; //Links between two nodes.
 
 var outlineCreated = false;
 
-//Not my code, from: https://stackoverflow.com/questions/16873323/javascript-sleep-wait-before-continuing
-function sleep(milliseconds) {
-    var start = new Date().getTime();
-    for (var i = 0; i < 1e7; i++) {
-        if ((new Date().getTime() - start) > milliseconds){
-            break;
-        }
-    }
-}
-
 //TODO: Reset everything to be empty prior to generating a new view.
 function clearCloud(){
     mappingCounts = [];
     nodes = [];
     links = [];
+}
+
+//Event for mouse over events
+function mouseOnCloudSection(){
+    //Change the highlight of the selected area outline
+    d3.select(this).style("stroke", "blue");
+
+    //Change draw order (This must be drawn last to avoid overlap as subsequent sections are drawn).
+    this.parentNode.appendChild(this);
+}
+
+function mouseOffCloudSection(){
+    d3.select(this).style("stroke", "black");
+
+    var firstChild = this.parentNode.firstChild;
+    this.parentNode.insertBefore(this, firstChild);
+}
+
+function mouseClickCloudSection(){
+    d3.select(this).style("stroke", "yellow");
+    //Change draw order (This must be drawn last to avoid overlap as subsequent sections are drawn).
+    this.parentNode.appendChild(this);
 }
 
 function buildOutline() {
@@ -54,6 +74,10 @@ function buildOutline() {
                 .attr("stroke", "black");
         }
     }
+    //TODO: add event handlers for all necessary elements.
+
+    var theRects = theSVG.selectAll("rect");
+    theRects.on("mouseover", mouseOnCloudSection).on("mouseout", mouseOffCloudSection);
 }
 
 //Draws the outline.
@@ -103,12 +127,10 @@ function buildCloud() {
 
     //Create a link between each search term and every document, and set the link force between them
     //to be proportional to their relative TF-IDF scores. Direction: Document -> Search Term
-    var scalingFactor = 1/forceRange;
-
     for (i = 0; i < documents.length; i++) {
         for(j = 0;j < query.length;j++){
             //TODO: Scaling for force value? Scaling factor: 1/MAX_TFIDF, to get force multiply this by documents[i].keywordForces[j]
-            links.push({"source": (i + numTerms), "target": j, "strength": (documents[i].keywordForces[j] * scalingFactor)});
+            links.push({"source": (i + numTerms), "target": j, "strength": (documents[i].keywordForces[j])});
             //console.log("source: " + (i + numTerms) + "target: " + j + "strength: " + (documents[i].keywordForces[j] * scalingFactor * superScalingFactor));
         }
     }
