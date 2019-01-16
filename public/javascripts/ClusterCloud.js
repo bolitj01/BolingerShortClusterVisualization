@@ -1,8 +1,8 @@
 var marginSize = 100;
-var chartSize = 800;
+var chartSize = 1000;
 var cloudSize = chartSize + (2 * marginSize); //(border on left/right above/below)
 var fontSize = 20;
-var numRowsCols = 10; //Keep rows == columns
+var numRowsCols = [5, 10, 20, 50, 100]; //Keep rows == columns, controlled by the detail slider variable "slider". Its value maps to index locations for this array (subtract 1)
 //var mapColors = ["blue", "purple", "red"];
 
 //From: http://www.perbang.dk/rgbgradient/ {
@@ -22,10 +22,16 @@ var links = []; //Links between two nodes.
 var outlineCreated = false;
 
 //TODO: Reset everything to be empty prior to generating a new view.
-function clearCloud(){
+function clearCloud() {
+    //Reset fields
     mappingCounts = [];
     nodes = [];
     links = [];
+    outlineCreated = false;
+
+    //Delete old svg contents
+    var theSVG = d3.select("svg");
+    theSVG.selectAll("*").remove();
 }
 
 //Event for mouse over events
@@ -57,31 +63,34 @@ function buildOutline() {
         .attr("height", cloudSize);
 
     //Determine step size and total number of query terms
-    var stepSize = chartSize / numRowsCols;
+    var stepSize = chartSize / numRowsCols[slider.value - 1];
     var numTerms = query.length;
 
     //Build each section, forming a 2D array.
-    var i, j, k;
-    for (i = 0; i < numRowsCols; i++) {
-        for (j = 0; j < numRowsCols; j++) {
+    var i, j;
+    for (i = 0; i < numRowsCols[slider.value - 1]; i++) {
+        for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
             var sect = theSVG.append("rect")
                 .attr("x", (j * stepSize) + marginSize)
                 .attr("y", (i * stepSize) + marginSize)
                 .attr("width", stepSize)
                 .attr("height", stepSize)
                 .attr("fill", "white")
-                .attr("id", "r" + i + "" + j)
+                .attr("id", "r" + i + "_" + j)
                 .attr("stroke", "black");
         }
     }
     //TODO: add event handlers for all necessary elements.
 
+    //Register mouseover event for individual cloud segments.
     var theRects = theSVG.selectAll("rect");
     theRects.on("mouseover", mouseOnCloudSection).on("mouseout", mouseOffCloudSection);
 }
 
 //Draws the outline.
 function buildCloud() {
+    console.log(slider.value - 1);
+
     //Clear anything existing, we're starting from scratch.
     clearCloud();
 
@@ -91,7 +100,7 @@ function buildCloud() {
     }
 
     //Determine step size and total number of query terms
-    var stepSize = chartSize / numRowsCols;
+    var stepSize = chartSize / numRowsCols[slider.value - 1]; //Note: This should be a "neat" division, with no fractions. Else it's possible the cloud will be slightly misformed (off by some number of pixels)
     var numTerms = query.length;
 
     var theSVG = d3.select("svg");
@@ -187,11 +196,11 @@ function buildCloud() {
     //within the boundaries for each given section.
     var curX, curY = 0;
     //Loop over the height(rows) of the cloud.
-    for(i = 0;i < numRowsCols;i++){
+    for (i = 0; i < numRowsCols[slider.value - 1];i++){
         curX = 0;
         mappingCounts.push([]);
         //Loop over the width(columns) of the cloud.
-	    for(j = 0;j < numRowsCols;j++){
+        for (j = 0; j < numRowsCols[slider.value - 1];j++){
 	        mappingCounts[i][j] = 0;
 	        //Loop over every node that isn't a search term (a document in the corpus).
             for(k = numTerms;k < nodes.length;k++){ //Start at numTerms to skip all query term nodes.
@@ -211,8 +220,8 @@ function buildCloud() {
     //Now that we have a number of counts, determine the max and min values.
     var minCount = mappingCounts[0][0]; //Default to a given element of the 2D array.
     var maxCount = mappingCounts[0][0];
-    for(i = 0;i < numRowsCols;i++) {
-        for (j = 0; j < numRowsCols; j++) {
+    for (i = 0; i < numRowsCols[slider.value - 1];i++) {
+        for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
             if(mappingCounts[i][j] > maxCount){
                 maxCount = mappingCounts[i][j];
             }
@@ -223,8 +232,8 @@ function buildCloud() {
     }
 
     //Map these values to colors, and color the svg accordingly.
-    for(i = 0;i < numRowsCols;i++) {
-        for (j = 0; j < numRowsCols; j++) {
+    for (i = 0; i < numRowsCols[slider.value - 1];i++) {
+        for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
             //Logically we're shifting the minimum to the "zero", finding out what percentage of the maximum we have in this section
             //and then multiplying that value by the number of available colors - 1 (indexing). Last, we floor the entire calculation.
             var colorIndex = Math.floor(((mappingCounts[i][j] - minCount) / (maxCount - minCount)) * (mapColors.length - 1));
@@ -317,8 +326,8 @@ function createGraph(){
 function randomColoring(){
 	var i = 0;
 	var j = 0;
-	for(i = 0;i < numRowsCols;i++){
-		for(j = 0;j < numRowsCols;j++){
+    for (i = 0; i < numRowsCols[slider.value - 1];i++){
+        for (j = 0; j < numRowsCols[slider.value - 1];j++){
 			var rand = Math.random() * mapColors.length;
             colorCloudSection(i, j, Math.floor(rand));
 		}
@@ -331,8 +340,12 @@ function toRadians (angle) {
 }
 
 //Colors a single section of the chart a given color.
-function colorCloudSection(x, y, colorIndex){
-	d3.select("svg").select("#r"+x+""+y).style("fill", mapColors[colorIndex]);
+function colorCloudSection(x, y, colorIndex) {
+    if (x == 25 && y == 6) {
+        console.log("Color Index for white: " + colorIndex);
+        console.log(mapColors[colorIndex]);
+    }
+	d3.select("svg").select("#r"+x+"_"+y).style("fill", mapColors[colorIndex]);
 }
 
 //TODO: Map 8 triangles to square positions. Can use this for force mapping too.
