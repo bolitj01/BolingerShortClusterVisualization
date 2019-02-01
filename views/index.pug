@@ -25,7 +25,10 @@ block content
         div(id="sliderDisplay")
             h3(id="sliderLabel") Detail Level
             input(id="slider" type="range" min="1" value="2" max="5")
-    br
+            h3(id="graphToggleLabel") Use Clustering?
+            input(id="graphToggleCheckbox" type="checkbox" checked)
+            h3(id="graphTotalDisplayLabel") Total number of documents displayed:
+            input(id="graphTotalValue" type="text")
     svg(id="ClusterCloud")
     br
     

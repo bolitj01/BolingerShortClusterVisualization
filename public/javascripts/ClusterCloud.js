@@ -14,12 +14,18 @@ var mapColors = ["0000FF", "1C00E2", "3800C6", "5500AA", "71008D", "8D0071", "AA
 
 
 var numFDGIterations = 300; //How many times are we updating node positions based off of forces?
+var nodeSize = 3; //radius of document nodes (when not clustering)
+var outlineCreated = false;
 
 var mappingCounts = []; //array to keep track of # docs -> spaces
 var nodes = []; //A node represents either a search term, or a document. Search terms are fixed position around the cloud.
 var links = []; //Links between two nodes.
 
-var outlineCreated = false;
+//Controls for keeping track of zooming properties.
+var rightX = chartSize;
+var topY = 0;
+var bottomY = chartSize;
+var leftX = 0;
 
 //TODO: Reset everything to be empty prior to generating a new view.
 function clearCloud() {
@@ -28,6 +34,12 @@ function clearCloud() {
     nodes = [];
     links = [];
     outlineCreated = false;
+    rightX = chartSize;
+    bottomY = chartSize;
+    topY = 0;
+    leftX = 0;
+
+    graphTotalValue.value = ""
 
     //Delete old svg contents
     var theSVG = d3.select("svg");
@@ -66,34 +78,71 @@ function buildOutline() {
     var stepSize = chartSize / numRowsCols[slider.value - 1];
     var numTerms = query.length;
 
-    //Build each section, forming a 2D array.
-    var i, j;
-    for (i = 0; i < numRowsCols[slider.value - 1]; i++) {
-        for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
-            var sect = theSVG.append("rect")
-                .attr("x", (j * stepSize) + marginSize)
-                .attr("y", (i * stepSize) + marginSize)
-                .attr("width", stepSize)
-                .attr("height", stepSize)
-                .attr("fill", "white")
-                .attr("id", "r" + i + "_" + j)
-                .attr("stroke", "black");
+    //Build the cloud
+    if (graphToggleCheckbox.checked) {
+        //Build each section, forming a 2D array.
+        var i, j;
+        for (i = 0; i < numRowsCols[slider.value - 1]; i++) {
+            for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
+                var sect = theSVG.append("rect")
+                    .attr("x", (j * stepSize) + marginSize)
+                    .attr("y", (i * stepSize) + marginSize)
+                    .attr("width", stepSize)
+                    .attr("height", stepSize)
+                    .attr("fill", "white")
+                    .attr("id", "r" + i + "_" + j)
+                    .attr("stroke", "black");
+            }
         }
-    }
-    //TODO: add event handlers for all necessary elements.
+        //TODO: add event handlers for all necessary elements.
 
-    //Register mouseover event for individual cloud segments.
-    var theRects = theSVG.selectAll("rect");
-    theRects.on("mouseover", mouseOnCloudSection).on("mouseout", mouseOffCloudSection);
+        //Register mouseover event for individual cloud segments.
+        var theRects = theSVG.selectAll("rect");
+        theRects.on("mouseover", mouseOnCloudSection).on("mouseout", mouseOffCloudSection);
+    }
+    //Else, just draw an outline.
+    else {
+        //Top
+        theSVG.append("line")
+            .attr("x1", marginSize)
+            .attr("y1", marginSize)
+            .attr("x2", marginSize + chartSize)
+            .attr("y2", marginSize)
+            .attr("id", "top_line")
+            .attr("stroke", "black");
+        //Right
+        theSVG.append("line")
+            .attr("x1", marginSize + chartSize)
+            .attr("y1", marginSize)
+            .attr("x2", marginSize + chartSize)
+            .attr("y2", marginSize + chartSize)
+            .attr("id", "right_line")
+            .attr("stroke", "black");
+        //Bottom
+        theSVG.append("line")
+            .attr("x1", marginSize + chartSize)
+            .attr("y1", marginSize + chartSize)
+            .attr("x2", marginSize)
+            .attr("y2", marginSize + chartSize)
+            .attr("id", "bottom_line")
+            .attr("stroke", "black");
+        //Left
+        theSVG.append("line")
+            .attr("x1", marginSize)
+            .attr("y1", marginSize + chartSize)
+            .attr("x2", marginSize)
+            .attr("y2", marginSize)
+            .attr("id", "left_line")
+            .attr("stroke", "black");
+    }
 }
 
 //Draws the outline.
 function buildCloud() {
-    console.log(slider.value - 1);
-
     //Clear anything existing, we're starting from scratch.
     clearCloud();
 
+    //If we don't have an outline yet, create it (populate the cloud segments, or draw an outline in the case of a pure graph).
     if(!outlineCreated){
         buildOutline();
         outlineCreated = true;
@@ -106,25 +155,27 @@ function buildCloud() {
     var theSVG = d3.select("svg");
 
     //Place the search terms/force nodes around the cloud, starting at the top left.
-    var xyCoordinates = determineQueryNodeLocations(numTerms);
+    if (numTerms != 0) {
+        var xyCoordinates = determineQueryNodeLocations(numTerms);
 
-    //Draw the labels for the query terms onto the cloud.
-    for (i = 0; i < xyCoordinates.length; i++) {
-        theSVG.append("text")
-            .attr("x", xyCoordinates[i][0])
-            .attr("y", xyCoordinates[i][1])
-            .attr("font-size", fontSize)
-            .text(query[i]);
+        //Draw the labels for the query terms onto the cloud.
+        for (i = 0; i < xyCoordinates.length; i++) {
+            theSVG.append("text")
+                .attr("x", xyCoordinates[i][0])
+                .attr("y", xyCoordinates[i][1])
+                .attr("font-size", fontSize)
+                .text(query[i]);
 
-        //Create a node for the search term and fix it's x and y locations.
-        nodes.push({"id": query[i]});
-        //A note: if I'm offsetting by marginSize in determineQueryNodeLocations these values may need to be adjusted accordingly.
-        nodes[i].fx = xyCoordinates[i][0] - marginSize;
-        nodes[i].fy = xyCoordinates[i][1] - marginSize;
-        nodes[i].x = xyCoordinates[i][0] - marginSize;
-        nodes[i].y = xyCoordinates[i][1] - marginSize;
-        console.log(nodes[i].fx);
-        console.log(nodes[i].fy);
+            //Create a node for the search term and fix it's x and y locations.
+            nodes.push({ "id": query[i] });
+            //A note: if I'm offsetting by marginSize in determineQueryNodeLocations these values may need to be adjusted accordingly.
+            nodes[i].fx = xyCoordinates[i][0] - marginSize;
+            nodes[i].fy = xyCoordinates[i][1] - marginSize;
+            nodes[i].x = xyCoordinates[i][0] - marginSize;
+            nodes[i].y = xyCoordinates[i][1] - marginSize;
+            //console.log(nodes[i].fx);
+            //console.log(nodes[i].fy);
+        }
     }
 
     //Create a node for every document in the corpus.
@@ -159,12 +210,12 @@ function buildCloud() {
         simulation.tick();
     }
 
-    console.log("Number of iterations: " + i);
+    //console.log("Number of iterations: " + i);
 
     //Debug output
-    for(i = 0;i < nodes.length;i++){
-        console.log("x: "+ nodes[i].x + " y: " + nodes[i].y);
-    }
+    //for(i = 0;i < nodes.length;i++){
+    //    console.log("x: "+ nodes[i].x + " y: " + nodes[i].y);
+    //}
 
     //There is no guarantee that the force layout kept the nodes within the bounding box, simply linearly push any that
     //remain out of bounds at convergence to be within the x/y limits.
@@ -192,53 +243,77 @@ function buildCloud() {
         }
     }
 
-    //Now we have an x and y position for every node in the graph. For every (x, y) determine if that value falls
-    //within the boundaries for each given section.
-    var curX, curY = 0;
-    //Loop over the height(rows) of the cloud.
-    for (i = 0; i < numRowsCols[slider.value - 1];i++){
-        curX = 0;
-        mappingCounts.push([]);
-        //Loop over the width(columns) of the cloud.
-        for (j = 0; j < numRowsCols[slider.value - 1];j++){
-	        mappingCounts[i][j] = 0;
-	        //Loop over every node that isn't a search term (a document in the corpus).
-            for(k = numTerms;k < nodes.length;k++){ //Start at numTerms to skip all query term nodes.
-                //console.log(nodes[k].x, nodes[k].y);
-                //Known bug: this will have some small overlap in the incredibly miniscule chance that a value falls perfectly between two(four in the rarer case of a corner) chunks.
-                //Current status: Left as is, avoids needing special processing for last row/col.
-                if(nodes[k].x >= curX && nodes[k].x <= (curX + stepSize) && nodes[k].y >= curY && nodes[k].y <= (curY + stepSize)){
-                    mappingCounts[i][j]++;
+    //If we're clustering, do that here.
+    if (graphToggleCheckbox.checked) {
+        //Now we have an x and y position for every node in the graph. For every (x, y) determine if that value falls
+        //within the boundaries for each given section.
+        var curX, curY = 0;
+        //Loop over the height(rows) of the cloud.
+        for (i = 0; i < numRowsCols[slider.value - 1]; i++) {
+            curX = 0;
+            mappingCounts.push([]);
+            //Loop over the width(columns) of the cloud.
+            for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
+                mappingCounts[i][j] = 0;
+                //Loop over every node that isn't a search term (a document in the corpus).
+                for (k = numTerms; k < nodes.length; k++) { //Start at numTerms to skip all query term nodes.
+                    //console.log(nodes[k].x, nodes[k].y);
+                    //Known bug: this will have some small overlap in the incredibly miniscule chance that a value falls perfectly between two(four in the rarer case of a corner) chunks.
+                    //Current status: Left as is, avoids needing special processing for last row/col.
+                    if (nodes[k].x >= curX && nodes[k].x <= (curX + stepSize) && nodes[k].y >= curY && nodes[k].y <= (curY + stepSize)) {
+                        mappingCounts[i][j]++;
+                    }
+                }
+                //console.log(mappingCounts[i][j]);
+                curX += stepSize;
+            }
+            curY += stepSize;
+        }
+
+        //Now that we have a number of counts, determine the max and min values.
+        var minCount = mappingCounts[0][0]; //Default to a given element of the 2D array.
+        var maxCount = mappingCounts[0][0];
+        var totalInDisplayedGraph = 0;
+        for (i = 0; i < numRowsCols[slider.value - 1]; i++) {
+            for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
+                totalInDisplayedGraph += mappingCounts[i][j];
+                if (mappingCounts[i][j] > maxCount) {
+                    maxCount = mappingCounts[i][j];
+                }
+                if (mappingCounts[i][j] < minCount) {
+                    minCount = mappingCounts[i][j];
                 }
             }
-            console.log(mappingCounts[i][j]);
-            curX += stepSize;
         }
-        curY += stepSize;
-    }
+        graphTotalValue.value = totalInDisplayedGraph
 
-    //Now that we have a number of counts, determine the max and min values.
-    var minCount = mappingCounts[0][0]; //Default to a given element of the 2D array.
-    var maxCount = mappingCounts[0][0];
-    for (i = 0; i < numRowsCols[slider.value - 1];i++) {
-        for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
-            if(mappingCounts[i][j] > maxCount){
-                maxCount = mappingCounts[i][j];
-            }
-            if(mappingCounts[i][j] < minCount){
-                minCount = mappingCounts[i][j];
+        //Map these values to colors, and color the svg accordingly.
+        for (i = 0; i < numRowsCols[slider.value - 1]; i++) {
+            for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
+                //Logically we're shifting the minimum to the "zero", finding out what percentage of the maximum we have in this section
+                //and then multiplying that value by the number of available colors - 1 (indexing). Last, we floor the entire calculation.
+                var colorIndex = Math.floor(((mappingCounts[i][j] - minCount) / (maxCount - minCount)) * (mapColors.length - 1));
+                colorCloudSection(i, j, colorIndex);
             }
         }
     }
-
-    //Map these values to colors, and color the svg accordingly.
-    for (i = 0; i < numRowsCols[slider.value - 1];i++) {
-        for (j = 0; j < numRowsCols[slider.value - 1]; j++) {
-            //Logically we're shifting the minimum to the "zero", finding out what percentage of the maximum we have in this section
-            //and then multiplying that value by the number of available colors - 1 (indexing). Last, we floor the entire calculation.
-            var colorIndex = Math.floor(((mappingCounts[i][j] - minCount) / (maxCount - minCount)) * (mapColors.length - 1));
-            colorCloudSection(i, j, colorIndex);
+    //Simply draw a circle for each node.
+    else {
+        var totalInDisplayedGraph = 0;
+        for (k = numTerms; k < nodes.length; k++) { //Start at numTerms to skip all query term nodes.
+            //TODO: Add a bounds check here, as we only want to draw the nodes that apppear in the current level of zoom, also need to manipulate their true positions accordingly.
+            if ((nodes[k].x <= rightX && nodes[k].x >= leftX) && (nodes[k].y >= topY && nodes[k].y <= bottomY)) {
+                //TODO: Apply whatever additional visual encodings you want to each individual node, if you so want to, here. Right now it's just a black circle as a placeholder.
+                theSVG.append("circle")
+                    .attr("cx", nodes[k].x + marginSize)
+                    .attr("cy", nodes[k].y + marginSize)
+                    .attr("r", nodeSize)
+                    .attr("fill", "black")
+                    .attr("id", "c" + k);
+                totalInDisplayedGraph++;
+            }
         }
+        graphTotalValue.value = totalInDisplayedGraph;
     }
 
     //randomColoring();
@@ -311,17 +386,6 @@ function determineQueryNodeLocations(numTerms){
     return xyCoordinates;
 }
 
-//TODO: Implement a force directed graph
-function createGraph(){
-    //create a force directed graph
-    var force = d3.layout.force()
-        .size([chartSize, chartSize])
-        .nodes(d3.values(nodes))
-        .links(links)
-        .on("tick", tick)
-
-}
-
 //Proof of concept. Randomly colors sections to show what layouts COULD look like.
 function randomColoring(){
 	var i = 0;
@@ -341,10 +405,6 @@ function toRadians (angle) {
 
 //Colors a single section of the chart a given color.
 function colorCloudSection(x, y, colorIndex) {
-    if (x == 25 && y == 6) {
-        console.log("Color Index for white: " + colorIndex);
-        console.log(mapColors[colorIndex]);
-    }
 	d3.select("svg").select("#r"+x+"_"+y).style("fill", mapColors[colorIndex]);
 }
 
